@@ -357,6 +357,8 @@ exports.ondeactivate = function() {};
  */
 exports.onfailure = function() {};
 
+exports.onaction = function() {};
+
 
 /***********
  * PRIVATE *
@@ -389,7 +391,8 @@ exports._defaults = {
     silent:  false,
     hidden:  true,
     color:   undefined,
-    icon:    'icon'
+    icon:    'icon',
+    actions: undefined
 };
 
 /**

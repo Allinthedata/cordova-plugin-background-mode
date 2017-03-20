@@ -26,6 +26,7 @@ import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Resources;
@@ -33,8 +34,13 @@ import android.os.Binder;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.PowerManager;
+import android.os.Bundle;
 
+import org.json.JSONException;
 import org.json.JSONObject;
+import org.json.JSONArray;
+
+import java.util.Random;
 
 import static android.os.PowerManager.PARTIAL_WAKE_LOCK;
 
@@ -187,8 +193,41 @@ public class ForegroundService extends Service {
 
             notification.setContentIntent(contentIntent);
         }
+        
+        JSONArray actions = settings.optJSONArray("actions");
+        if (actions != null && actions.length() > 0) {
+            for (int i = 0; i < actions.length(); ++i) {
+                JSONObject action = actions.optJSONObject(i);
+                if (action != null) {
+                    createAndAddAction(notification, action);
+                }
+            }
+        }
 
         return notification.build();
+    }
+
+    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+    protected void createAndAddAction(Notification.Builder builder, JSONObject action) {
+        Context context = getApplicationContext();
+
+        try {
+            String eventName = action.getString("event");
+            String title = action.getString("title");
+
+            Intent intent = new Intent(BackgroundMode.ACTION_FIRE_EVENT)
+                .putExtra(BackgroundMode.ACTION_FIRE_EVENT_NAME, eventName);
+
+            int index = new Random().nextInt();
+
+            PendingIntent pendingIntent = PendingIntent.getBroadcast(context, index, intent, PendingIntent.FLAG_CANCEL_CURRENT);
+            Notification.Action.Builder actionBuilder = new Notification.Action.Builder(0, title, pendingIntent);
+            Notification.Action mAction = actionBuilder.build();
+
+            builder.addAction(mAction);
+        } catch (JSONException e) {
+
+        }
     }
 
     /**
@@ -276,5 +315,4 @@ public class ForegroundService extends Service {
     private NotificationManager getNotificationManager() {
         return (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
     }
-
 }

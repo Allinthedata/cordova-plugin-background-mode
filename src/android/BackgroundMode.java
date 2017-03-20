@@ -22,9 +22,13 @@
 package de.appplant.cordova.plugin.background;
 
 import android.app.Activity;
+import android.content.Context;
+import android.content.IntentFilter;
+import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.os.Bundle;
 import android.os.IBinder;
 
 import org.apache.cordova.CallbackContext;
@@ -41,12 +45,15 @@ public class BackgroundMode extends CordovaPlugin {
 
     // Event types for callbacks
     private enum Event {
-        ACTIVATE, DEACTIVATE, FAILURE
+        ACTIVATE, DEACTIVATE, FAILURE, ACTION
     }
 
     // Plugin namespace
     private static final String JS_NAMESPACE =
             "cordova.plugins.backgroundMode";
+    
+    public static final String ACTION_FIRE_EVENT = "de.appplant.cordova.plugin.background.fireEvent";
+    public static final String ACTION_FIRE_EVENT_NAME = "de.appplant.cordova.plugin.background.fireEvent.eventName";
 
     // Flag indicates if the app is in background or foreground
     private boolean inBackground = false;
@@ -56,6 +63,8 @@ public class BackgroundMode extends CordovaPlugin {
 
     // Flag indicates if the service is bind
     private boolean isBind = false;
+    
+    private ActionReceiver actionReceiver = null;
 
     // Default settings for the notification
     private static JSONObject defaultSettings = new JSONObject();
@@ -162,6 +171,7 @@ public class BackgroundMode extends CordovaPlugin {
      */
     private void enableMode() {
         isDisabled = false;
+        registerActionReceivers();
 
         if (inBackground) {
             startService();
@@ -173,7 +183,21 @@ public class BackgroundMode extends CordovaPlugin {
      */
     private void disableMode() {
         stopService();
+        unregisterActionReceivers();
+        
         isDisabled = true;
+    }
+    
+    private void registerActionReceivers() {
+        IntentFilter filter = new IntentFilter(ACTION_FIRE_EVENT);
+        actionReceiver = new ActionReceiver(this);
+        
+        cordova.getActivity().registerReceiver(actionReceiver, filter);
+    }
+    
+    private void unregisterActionReceivers() {
+        cordova.getActivity().unregisterReceiver(actionReceiver);
+        actionReceiver = null;
     }
 
     /**
@@ -267,7 +291,7 @@ public class BackgroundMode extends CordovaPlugin {
      * @param event The name of the event
      * @param params Optional arguments for the event
      */
-    private void fireEvent (Event event, String params) {
+    protected void fireEvent (Event event, String params) {
         String eventName = event.name().toLowerCase();
         Boolean active   = event == Event.ACTIVATE;
 
@@ -289,5 +313,21 @@ public class BackgroundMode extends CordovaPlugin {
             }
         });
     }
-
+    
+    public class ActionReceiver extends BroadcastReceiver {
+        
+        protected BackgroundMode plugin = null;
+        
+        public ActionReceiver(BackgroundMode plugin) {
+            this.plugin = plugin;
+        }
+        
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            Bundle extras = intent.getExtras();
+            String eventName = (String) extras.getSerializable(BackgroundMode.ACTION_FIRE_EVENT_NAME);
+            
+            plugin.fireEvent(Event.ACTION, String.format("'%s'", eventName));
+        }
+    }
 }
